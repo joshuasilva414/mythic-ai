@@ -1,4 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
+import { ModelMessage } from 'ai';
+import PQueue from 'p-queue';
 
 /**
  * Welcome to Cloudflare Workers! This is your first Durable Objects application.
@@ -15,6 +17,8 @@ import { DurableObject } from 'cloudflare:workers';
 
 /** A Durable Object's behavior is defined in an exported Javascript class */
 export class DungeonMasterDurableObject extends DurableObject<Env> {
+	env: Env;
+	msgHistory: ModelMessage[];
 	/**
 	 * The constructor is invoked once upon creation of the Durable Object, i.e. the first call to
 	 * 	`DurableObjectStub::get` for a given identifier (no-op constructors can be omitted)
@@ -24,6 +28,30 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 	 */
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
+		this.env = env;
+		this.msgHistory = [];
+	}
+
+	async fetch(request: Request) {
+		const webSocketPair = new WebSocketPair();
+		const [socket, ws] = Object.values(webSocketPair);
+
+		console.log('request', request.method, request.url);
+
+		ws.accept();
+		ws.send(JSON.stringify({ type: 'status', text: 'ready' }));
+
+		const queue = new PQueue();
+
+		ws.addEventListener('message', async (event) => {
+			if (typeof event.data === 'string') {
+				const { type, data } = JSON.parse(event.data);
+				if (type === 'cmd' && data === 'clear') {
+					this.msgHistory.length = 0; // clear chat history
+				}
+				return; // end processing here for this event type
+			}
+		});
 	}
 
 	/**

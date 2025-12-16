@@ -11,5 +11,9 @@
 	"devDependencies": {
 		"typescript": "^5.5.2",
 		"wrangler": "^4.44.0"
+	},
+	"dependencies": {
+		"ai": "^5.0.113",
+		"p-queue": "^9.0.1"
 	}
 }
