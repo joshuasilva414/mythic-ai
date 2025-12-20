@@ -10,7 +10,7 @@ export default function Home() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-500/20">
             <Dice5 className="h-5 w-5" />
           </div>
-          <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-400">
+          <span className="bg-linear-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-400">
             Mythic AI
           </span>
         </div>
@@ -42,7 +42,7 @@ export default function Home() {
           {/* Heading */}
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl md:text-7xl">
             Where Stories <br className="hidden sm:block" />
-            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400">
+            <span className="bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400">
               Come Alive
             </span>
           </h1>
