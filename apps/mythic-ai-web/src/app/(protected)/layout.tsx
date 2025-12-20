@@ -1,4 +1,5 @@
 import SignOutButton from "@/components/auth/sign-out-button";
+import Navbar from "@/components/layout/navbar";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -16,11 +17,7 @@ export default async function Layout({
   }
   return (
     <div>
-      <div>
-        <h1>Welcome {session.user.email}</h1>
-        <SignOutButton />
-      </div>
-
+      <Navbar session={session} />
       {children}
     </div>
   );

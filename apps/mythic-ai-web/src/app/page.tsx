@@ -16,7 +16,7 @@ export default function Home() {
         </div>
         <nav className="flex gap-4">
           <Link
-            href="/session"
+            href="/sign-in"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
           >
             Sign In
