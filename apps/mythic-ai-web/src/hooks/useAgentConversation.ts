@@ -1,7 +1,9 @@
 import { useConversation } from "@elevenlabs/react";
 
 export const useAgentConversation = () => {
-  const conversation = useConversation();
+  const conversation = useConversation({
+    micMuted: false,
+  });
 
   const startConversation = async () => {
     const response = await fetch("/api/agent_url", {
