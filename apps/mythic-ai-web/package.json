@@ -14,6 +14,7 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.88",
     "@elevenlabs/react": "^0.12.3",
     "@libsql/client": "^0.15.15",
     "@opennextjs/cloudflare": "^1.3.0",
@@ -25,6 +26,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
     "@types/three": "^0.182.0",
+    "ai": "^5.0.113",
     "better-auth": "^1.4.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -39,7 +41,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "three": "^0.182.0",
-    "voice-stream": "^1.0.1"
+    "voice-stream": "^1.0.1",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

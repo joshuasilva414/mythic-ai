@@ -1,4 +1,4 @@
-import { getCampaigns, createCampaign } from "./actions";
+import { getCampaigns, createCampaign } from "@/actions/campaigns";
 import {
   Card,
   CardHeader,
@@ -67,14 +67,14 @@ export default async function CampaignsPage() {
                 {campaign.description}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex-grow">
+            <CardContent className="grow">
               <p className="text-sm text-muted-foreground">
                 Created at: {new Date(campaign.createdAt).toLocaleDateString()}
               </p>
             </CardContent>
             <CardFooter>
               <Button asChild className="w-full" variant="secondary">
-                <Link href={`/campaigns/${campaign.id}`}>Play</Link>
+                <Link href={`/campaigns/${campaign.id}/session`}>Play</Link>
               </Button>
             </CardFooter>
           </Card>

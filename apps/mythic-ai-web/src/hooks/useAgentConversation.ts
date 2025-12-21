@@ -1,8 +1,22 @@
 import { useConversation } from "@elevenlabs/react";
+import { useState } from "react";
 
-export const useAgentConversation = () => {
+export const useAgentConversation = (prompt: string) => {
+  const [transcript, setTranscript] = useState<
+    { role: string; message: string }[]
+  >([]);
   const conversation = useConversation({
+    overrides: {
+      agent: {
+        prompt: {
+          prompt,
+        },
+      },
+    },
     micMuted: false,
+    onMessage: ({ message, role }) => {
+      setTranscript((prev) => [...prev, { role, message }]);
+    },
   });
 
   const startConversation = async () => {
@@ -28,5 +42,6 @@ export const useAgentConversation = () => {
     startConversation,
     stopConversation,
     conversation,
+    transcript,
   };
 };

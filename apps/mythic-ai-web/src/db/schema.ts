@@ -6,6 +6,7 @@ export const campaigns = sqliteTable("campaigns", {
   id: int("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   description: text("description").notNull(),
+  worldSetting: text("world_setting").notNull(),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),

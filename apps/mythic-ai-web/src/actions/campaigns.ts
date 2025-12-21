@@ -5,7 +5,28 @@ import { db } from "@/db";
 import { campaigns } from "@/db/schema";
 import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, unauthorized } from "next/navigation";
+import { generateWorld } from "@/lib/ai/setting";
+
+export async function getCampaign(id: string) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session) {
+    return unauthorized();
+  }
+
+  const campaign = await db.query.campaigns.findFirst({
+    where: eq(campaigns.id, Number(id)),
+  });
+
+  if (campaign?.userId !== session.user.id) {
+    return unauthorized();
+  }
+
+  return campaign;
+}
 
 export async function getCampaigns() {
   const session = await auth.api.getSession({
@@ -13,7 +34,7 @@ export async function getCampaigns() {
   });
 
   if (!session) {
-    return [];
+    return redirect("/sign-in");
   }
 
   const userCampaigns = await db.query.campaigns.findMany({
@@ -35,6 +56,7 @@ export async function createCampaign(formData: FormData) {
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
+  const worldSetting = await generateWorld();
 
   if (!name || !description) {
     throw new Error("Name and description are required");
@@ -44,6 +66,7 @@ export async function createCampaign(formData: FormData) {
     name,
     description,
     userId: session.user.id,
+    worldSetting,
   });
 
   redirect("/campaigns");
