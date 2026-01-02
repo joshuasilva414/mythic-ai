@@ -8,9 +8,7 @@ export const useAgentConversation = (prompt: string) => {
   const conversation = useConversation({
     overrides: {
       agent: {
-        prompt: {
-          prompt,
-        },
+        prompt: {prompt}
       },
     },
     micMuted: false,
