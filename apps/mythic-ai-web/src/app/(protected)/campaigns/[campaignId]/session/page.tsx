@@ -16,11 +16,9 @@ export default async function Home({
     return notFound();
   }
 
-  const prompt = dungeonMasterPrompt(campaign.worldSetting);
-
   return (
     <div className="flex flex-col items-center gap-4">
-      <Conversation prompt={prompt} />
+      <Conversation/>
     </div>
   );
 }

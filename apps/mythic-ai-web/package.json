@@ -25,7 +25,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
-    "@ricky0123/vad-react": "^0.0.36",
+    "@ricky0123/vad-react": "^0.0.30",
     "@types/three": "^0.182.0",
     "ai": "^5.0.113",
     "better-auth": "^1.4.7",

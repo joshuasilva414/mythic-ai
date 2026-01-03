@@ -42,3 +42,21 @@ function floatTo16(view: DataView, offset: number, input: Float32Array) {
     view.setInt16(pos, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
 }
+
+export function b64ToBlob(b64: string, mime: string) {
+  const i = b64.indexOf(","); // handles data:audio/mpeg;base64,XXX too
+  const clean = i >= 0 ? b64.slice(i + 1) : b64;
+  const bin = atob(clean);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Blob([u8], { type: mime });
+}
+
+export function sniffAudioMime(b64: string) {
+  const head = b64.slice(0, 8);
+  // WAV often starts with "RIFF" -> base64 "UklGR"
+  if (head.startsWith("UklGR")) return "audio/wav";
+  // MP3 with ID3 tag often starts "ID3" -> base64 "SUQz"
+  if (head.startsWith("SUQz") || b64.startsWith("/+")) return "audio/mpeg";
+  return "audio/mpeg";
+}

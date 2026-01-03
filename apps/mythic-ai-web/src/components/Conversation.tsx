@@ -5,41 +5,47 @@ import { useAgentConversation } from "../hooks/useAgentConversation";
 import { Orb } from "@/components/ui/orb";
 import { Button } from "@/components/ui/button";
 
-export function Conversation({ prompt }: { prompt: string }) {
-  const { startConversation, stopConversation, conversation, transcript } =
-    useAgentConversation(prompt);
+export function Conversation() {
+  const {
+    messages,
+    status,
+    connected,
+    listening,
+    playbackEl,
+    aiSpeaking,
+    audioCtx,
+    onStart,
+    onStop,
+    onClear,
+    chatContainerRef,
+    vad,
+  } = useAgentConversation();
 
   const handleStart = useCallback(async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      await startConversation();
+      // await navigator.mediaDevices.getUserMedia({ audio: true });
+      await onStart();
     } catch (error) {
       console.error("Failed to start conversation:", error);
     }
-  }, [startConversation]);
+  }, [onStart]);
 
   return (
     <div className="flex flex-col items-center gap-4">
       <Orb agentState={null} />
       <div className="flex gap-2">
-        <Button
-          onClick={handleStart}
-          disabled={conversation?.status == "connected"}
-        >
+        <Button onClick={handleStart} disabled={connected}>
           Start Conversation
         </Button>
-        <Button
-          onClick={stopConversation}
-          disabled={conversation?.status != "connected"}
-        >
+        <Button onClick={onStop} disabled={!connected}>
           Stop Conversation
         </Button>
       </div>
       <div className="flex flex-col items-center">
-        <p>Status: {conversation?.status}</p>
+        <p>Status: {status}</p>
       </div>
       <div className="flex flex-col items-center">
-        {transcript.map((message, index) => (
+        {messages.map((message, index) => (
           <div
             key={index}
             className={`flex flex-col ${message.role === "user" ? "justify-end" : "justify-start"}`}
@@ -47,7 +53,7 @@ export function Conversation({ prompt }: { prompt: string }) {
             <p className="text-sm text-muted-foreground">
               {message.role === "user" ? "You" : "Agent"}
             </p>
-            <p className="text-sm">{message.message}</p>
+            <p className="text-sm">{message.content}</p>
           </div>
         ))}
       </div>
