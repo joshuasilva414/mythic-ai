@@ -20,12 +20,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "types": [
-        "./cloudflare-env.d.ts",
-        "node"
-    ]
+    }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../../packages/db/drizzle.config.ts"],
+  "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]
 }

@@ -11,7 +11,7 @@ declare global {
   }
 }
 
-export const useAgentConversation = () => {
+export const useAgentConversation = (campaignId: string) => {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [status, setStatus] = useState<string>("");
   const [connected, setConnected] = useState(false);
@@ -30,8 +30,8 @@ export const useAgentConversation = () => {
   const serverUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    return `${proto}://${process.env.NEXT_PUBLIC_WS_HOST}/websocket`;
-  }, []);
+    return `${proto}://${process.env.NEXT_PUBLIC_WS_HOST}/websocket?campaignId=${campaignId}`;
+  }, [campaignId]);
 
   const vad = useMicVAD({
     startOnLoad: false,
@@ -255,7 +255,6 @@ export const useAgentConversation = () => {
       vad.pause();
       disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

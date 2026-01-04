@@ -14,7 +14,9 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.88",
+    "shared": "workspace:*",
+    "db": "workspace:*",
+    "@ai-sdk/openai": "^3.0.2",
     "@elevenlabs/react": "^0.12.3",
     "@libsql/client": "^0.15.15",
     "@opennextjs/cloudflare": "^1.3.0",
@@ -27,7 +29,7 @@
     "@react-three/fiber": "^9.4.2",
     "@ricky0123/vad-react": "^0.0.30",
     "@types/three": "^0.182.0",
-    "ai": "^5.0.113",
+    "ai": "^6.0.6",
     "better-auth": "^1.4.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

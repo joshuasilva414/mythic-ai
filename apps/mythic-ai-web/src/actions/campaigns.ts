@@ -1,12 +1,13 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db } from "@/db";
-import { campaigns } from "@/db/schema";
+import { db } from "db";
+import { campaigns } from "db/schema";
 import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
 import { redirect, unauthorized } from "next/navigation";
-import { generateWorld } from "@/lib/ai/setting";
+import { generateWorld } from "shared/ai/setting";
+import { gpt5 } from "@/lib/ai/models";
 
 export async function getCampaign(id: string) {
   const session = await auth.api.getSession({
@@ -56,7 +57,7 @@ export async function createCampaign(formData: FormData) {
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
-  const worldSetting = await generateWorld();
+  const worldSetting = await generateWorld(gpt5);
 
   if (!name || !description) {
     throw new Error("Name and description are required");

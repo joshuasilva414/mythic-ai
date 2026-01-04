@@ -8,156 +8,223 @@ import {
 	tool,
 } from 'ai';
 import { DurableObject } from 'cloudflare:workers';
-import { chatModel, ttsModel, sttModel } from './agent';
+// import { chatModel, ttsModel, sttModel } from './agent';
+import { createModels } from 'shared/ai/models';
 import PQueue from 'p-queue';
-import { openai } from '@ai-sdk/openai';
 import z from 'zod';
-import { env } from 'cloudflare:workers';
+import { dungeonMasterPrompt } from 'shared/ai/prompts/dm';
+import { createClient } from '@libsql/client/web';
+import { createDatabase, campaigns } from 'db';
+import { getWorldSetting } from 'shared/queries/campaign';
 
-/* Todo
- * ✅ 1. WS with frontend
- * ✅ 2. Get audio to backend
- * ✅ 3. Convert audio to text
- * ✅ 4. Run inference
- * ✅ 5. Convert result to audio
- * ✅ 6. Send audio to frontend
- */
-
-export class DungeonMasterDurableObject extends DurableObject {
+export class DungeonMasterDurableObject extends DurableObject<Env> {
 	env: Env;
+	campaignId: number;
 	msgHistory: ModelMessage[];
+	worldSetting?: string;
+	queue: PQueue;
+
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
 		this.env = env;
+		this.campaignId = Number.parseInt(ctx.id.name!);
 		this.msgHistory = [];
+		this.queue = new PQueue({ concurrency: 1 });
 	}
-	async fetch(request: Request) {
-		// set up ws pipeline
+
+	async init(campaignId: number) {
+		this.campaignId = campaignId;
+		if (!this.worldSetting) {
+			const client = createClient({
+				url: this.env.TURSO_DATABASE_URL,
+				authToken: this.env.TURSO_AUTH_TOKEN,
+			});
+			const db = createDatabase(client);
+			this.worldSetting = await getWorldSetting(db, campaigns, this.campaignId);
+		}
+	}
+
+	// Handle requests forwarded via stub.fetch()
+	// This is the entry point for WebSocket connections
+	async fetch(request: Request): Promise<Response> {
+		const upgradeHeader = request.headers.get('Upgrade');
+		if (upgradeHeader !== 'websocket') {
+			return new Response('Expected websocket upgrade', { status: 426 });
+		}
+
+		// Get campaignId from URL and initialize
+		const url = new URL(request.url);
+		const campaignId = url.searchParams.get('campaignId');
+		if (campaignId) {
+			await this.init(Number.parseInt(campaignId));
+		}
+
+		// Creates two ends of a WebSocket connection
 		const webSocketPair = new WebSocketPair();
-		const [socket, ws] = Object.values(webSocketPair);
+		const [client, server] = Object.values(webSocketPair);
 
-		console.log('request', request.method, request.url);
+		// Use acceptWebSocket() for Hibernatable WebSockets API
+		// This connects the WebSocket to the Durable Object and allows hibernation
+		this.ctx.acceptWebSocket(server);
 
-		ws.accept();
-		ws.send(JSON.stringify({ type: 'status', text: 'ready' })); // tell the client it’s safe to send
-		// const workersai = createWorkersAI({ binding: this.env.AI });
-		const queue = new PQueue({ concurrency: 1 });
+		// Send ready status (server is now managed by the DO, we can send on it)
+		server.send(JSON.stringify({ type: 'status', text: 'ready' }));
 
-		ws.addEventListener('message', async (event) => {
-			// handle chat commands
-			if (typeof event.data === 'string') {
-				const { type, data } = JSON.parse(event.data);
+		console.log('WebSocket connection established for campaign:', this.campaignId);
+
+		// Return the client end of the WebSocket to the caller
+		return new Response(null, { status: 101, webSocket: client });
+	}
+
+	// Hibernatable WebSocket handler - called when a message is received
+	async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+		const models = createModels({
+			openaiApiKey: this.env.OPENAI_API_KEY,
+			elevenlabsApiKey: this.env.ELEVENLABS_API_KEY,
+		});
+		// handle chat commands
+		if (typeof message === 'string') {
+			try {
+				const { type, data } = JSON.parse(message);
 				if (type === 'cmd' && data === 'clear') {
 					this.msgHistory.length = 0; // clear chat history
 				}
-				return; // end processing here for this event type
+			} catch {
+				// Not JSON, ignore
 			}
+			return; // end processing here for string messages
+		}
 
-			// transcribe audio buffer to text (stt)
-			const { text } = await transcribe({
-				model: openai.transcription('whisper-1'),
-				audio: [...new Uint8Array(event.data as ArrayBuffer)],
-			});
-			console.log('>>', text);
-			ws.send(JSON.stringify({ type: 'text', text })); // send transcription to client
-			this.msgHistory.push({ role: 'user', content: text });
+		// transcribe audio buffer to text (stt)
+		const { text } = await transcribe({
+			model: models.sttModel,
+			audio: message as ArrayBuffer,
+		});
+		console.log('>>', text);
+		ws.send(JSON.stringify({ type: 'text', text })); // send transcription to client
+		this.msgHistory.push({ role: 'user', content: text });
 
-			// run inference
-			console.log('Starting inference...');
+		// run inference
+		console.log('Starting inference...');
 
-			const result = await streamText({
-				model: chatModel,
-				messages: this.msgHistory,
-				tools: {
-					weather: tool({
-						description: 'Get the weather in a location',
-						inputSchema: z.object({
-							location: z.string().describe('The location to get the weather for'),
-						}),
-						execute: async ({ location }) => ({
-							location,
-							temperature: 72 + Math.floor(Math.random() * 21) - 10,
-						}),
-					}),
+		const result = await streamText({
+			model: models.chatModel,
+			messages: this.msgHistory,
+			// tools: {
+			// 	weather: tool({
+			// 		description: 'Get the weather in a location',
+			// 		inputSchema: z.object({
+			// 			location: z.string().describe('The location to get the weather for'),
+			// 		}),
+			// 		execute: async ({ location }) => ({
+			// 			location,
+			// 			temperature: 72 + Math.floor(Math.random() * 21) - 10,
+			// 		}),
+			// 	}),
+			// },
+			stopWhen: stepCountIs(5),
+			system: dungeonMasterPrompt(this.worldSetting!),
+			// maxOutputTokens: 160,
+			// temperature: 0.7,
+			// IMPORTANT: sentence chunking, no artificial delay
+			experimental_transform: smoothStream({
+				delayInMs: null,
+				chunking: (buf: string) => {
+					// emit a sentence if we see ., !, ? followed by space/end
+					const m = buf.match(/^(.+?[.!?])(?:\s+|$)/);
+					if (m) return m[0];
+					// otherwise emit a clause if it's getting long
+					if (buf.length > 120) return buf;
+					return null;
 				},
-				stopWhen: stepCountIs(5),
-				system: 'You are a helpful assistant in a voice conversation with the user',
-				maxOutputTokens: 160,
-				temperature: 0.7,
-				// IMPORTANT: sentence chunking, no artificial delay
-				experimental_transform: smoothStream({
-					delayInMs: null,
-					chunking: (buf: string) => {
-						// emit a sentence if we see ., !, ? followed by space/end
-						const m = buf.match(/^(.+?[.!?])(?:\s+|$)/);
-						if (m) return m[0];
-						// otherwise emit a clause if it’s getting long
-						if (buf.length > 120) return buf;
-						return null;
-					},
-				}),
+			}),
+		});
+
+		let fullReply = '';
+		for await (const chunk of result.textStream) {
+			const sentence = String(chunk).trim();
+			if (!sentence) continue;
+
+			fullReply += (fullReply ? ' ' : '') + sentence;
+			ws.send(JSON.stringify({ type: 'status', text: 'Speaking…' }));
+
+			console.log('<<', sentence);
+
+			// serialize TTS per sentence (keeps order) but don't block the reader too long
+			// DO NOT await here – let the reader continue; queue enforces order=1
+			void this.queue.add(async () => {
+				const tts = await generateSpeech({ model: models.ttsModel, text: sentence, voice: this.env.VOICE_ID });
+
+				// normalize to a base64 string
+				let b64: string;
+				if (typeof tts === 'string') {
+					b64 = tts;
+				} else if (tts && typeof tts === 'object' && 'audio' in tts) {
+					b64 = tts.audio.base64;
+				} else {
+					// Convert Uint8Array to base64
+					b64 = btoa(String.fromCharCode(...new Uint8Array(tts as ArrayBuffer)));
+				}
+
+				ws.send(JSON.stringify({ type: 'audio', text: sentence, audio: b64 }));
 			});
+		}
 
-			let fullReply = '';
-			for await (const chunk of result.textStream) {
-				const sentence = String(chunk).trim();
-				if (!sentence) continue;
+		// wait for audio queue to drain before closing the turn
+		await this.queue.onIdle();
 
-				fullReply += (fullReply ? ' ' : '') + sentence;
-				ws.send(JSON.stringify({ type: 'status', text: 'Speaking…' }));
+		// Only after the model finishes: add one assistant turn to history
+		this.msgHistory.push({ role: 'assistant', content: fullReply });
+		ws.send(JSON.stringify({ type: 'status', text: 'Idle' }));
 
-				console.log('<<', sentence);
+		// Optional debug:
+		console.log('finishReason:', await result.finishReason);
+	}
 
-				// serialize TTS per sentence (keeps order) but don't block the reader too long
-				// DO NOT await here – let the reader continue; queue enforces order=1
-				void queue.add(async () => {
-					const tts = await generateSpeech({ model: ttsModel as any, text: sentence, voice: this.env.VOICE_ID });
+	// Hibernatable WebSocket handler - called when the connection is closed
+	async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
+		console.log('WebSocket closed:', code, reason, wasClean);
+		ws.close(code, 'Durable Object is closing WebSocket');
+	}
 
-					// normalize to a base64 string
-					let b64: string;
-					if (typeof tts === 'string') {
-						b64 = tts;
-					} else if (tts && typeof tts === 'object' && 'audio' in tts) {
-						b64 = tts.audio.base64;
-					} else {
-						// Convert Uint8Array to base64
-						b64 = btoa(String.fromCharCode(...new Uint8Array(tts as ArrayBuffer)));
-					}
-
-					ws.send(JSON.stringify({ type: 'audio', text: sentence, audio: b64 }));
-				});
-			}
-
-			// wait for audio queue to drain before closing the turn
-			await queue.onIdle();
-
-			// Only after the model finishes: add one assistant turn to history
-			this.msgHistory.push({ role: 'assistant', content: fullReply });
-			ws.send(JSON.stringify({ type: 'status', text: 'Idle' }));
-
-			// Optional debug:
-			console.log('finishReason:', await result.finishReason);
-		});
-
-		ws.addEventListener('close', (cls) => {
-			ws.close(cls.code, 'Durable Object is closing WebSocket');
-		});
-
-		return new Response(null, { status: 101, webSocket: socket });
+	// Hibernatable WebSocket handler - called on WebSocket errors
+	async webSocketError(ws: WebSocket, error: unknown) {
+		console.error('WebSocket error:', error);
 	}
 }
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
-		// console.log('ctx.name:', ctx.props.name);
-		if (request.url.endsWith('/websocket')) {
+		if (request.url.includes('/websocket')) {
 			const upgradeHeader = request.headers.get('Upgrade');
 			if (!upgradeHeader || upgradeHeader !== 'websocket') {
-				return new Response('Expected upgrade to websocket', { status: 426 });
+				return new Response('Expected upgrade to websocket', {
+					status: 426,
+					headers: { 'Content-Type': 'text/plain' },
+				});
 			}
-			const id: DurableObjectId = env.DUNGEON_MASTER_DURABLE_OBJECT.idFromName(crypto.randomUUID());
-			const stub = env.DUNGEON_MASTER_DURABLE_OBJECT.get(id);
-			return stub.fetch(request);
+			try {
+				const campaignId = new URL(request.url).searchParams.get('campaignId');
+				if (!campaignId) {
+					return new Response('Missing campaignId', {
+						status: 400,
+						headers: { 'Content-Type': 'text/plain' },
+					});
+				}
+				// Get the Durable Object stub
+				const id = env.DUNGEON_MASTER_DURABLE_OBJECT.idFromName(campaignId);
+				const stub = env.DUNGEON_MASTER_DURABLE_OBJECT.get(id);
+
+				// Forward the request directly to the Durable Object
+				// The DO's fetch() method will handle the WebSocket upgrade
+				return stub.fetch(request);
+			} catch (error) {
+				console.error('WebSocket handler error:', error);
+				return new Response(`WebSocket error: ${error instanceof Error ? error.message : String(error)}`, {
+					status: 500,
+					headers: { 'Content-Type': 'text/plain' },
+				});
+			}
 		}
 
 		return new Response(null, {

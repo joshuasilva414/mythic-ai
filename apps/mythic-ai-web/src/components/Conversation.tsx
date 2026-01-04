@@ -5,7 +5,7 @@ import { useAgentConversation } from "../hooks/useAgentConversation";
 import { Orb } from "@/components/ui/orb";
 import { Button } from "@/components/ui/button";
 
-export function Conversation() {
+export function Conversation({ campaignId }: { campaignId: string }) {
   const {
     messages,
     status,
@@ -19,7 +19,7 @@ export function Conversation() {
     onClear,
     chatContainerRef,
     vad,
-  } = useAgentConversation();
+  } = useAgentConversation(campaignId);
 
   const handleStart = useCallback(async () => {
     try {

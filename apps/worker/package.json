@@ -9,14 +9,19 @@
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
+		"@types/node": "^20.19.23",
 		"typescript": "^5.5.2",
 		"wrangler": "^4.44.0"
 	},
 	"dependencies": {
 		"@ai-sdk/elevenlabs": "^2.0.2",
-		"@ai-sdk/openai": "^2.0.88",
+		"@ai-sdk/openai": "^3.0.2",
+		"@libsql/client": "^0.15.15",
 		"ai": "^6.0.6",
+		"db": "workspace:*",
+		"drizzle-orm": "^0.45.1",
 		"p-queue": "^9.0.1",
+		"shared": "workspace:*",
 		"zod": "^4.2.1"
 	}
 }
