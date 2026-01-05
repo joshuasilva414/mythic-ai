@@ -101,7 +101,11 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 			audio: message as ArrayBuffer,
 		});
 		console.log('>>', text);
-		ws.send(JSON.stringify({ type: 'text', text })); // send transcription to client
+
+		// Check if WebSocket is still open before sending transcription
+		if (ws.readyState === WebSocket.READY_STATE_OPEN) {
+			ws.send(JSON.stringify({ type: 'text', text })); // send transcription to client
+		}
 		this.msgHistory.push({ role: 'user', content: text });
 
 		// run inference
@@ -124,49 +128,66 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 			// },
 			stopWhen: stepCountIs(5),
 			system: dungeonMasterPrompt(this.worldSetting!),
-			// maxOutputTokens: 160,
-			// temperature: 0.7,
-			// IMPORTANT: sentence chunking, no artificial delay
+			maxOutputTokens: 2000, // GPT-5 reasoning consumes tokens before text output
+			// Sentence-based chunking for low-latency TTS
 			experimental_transform: smoothStream({
 				delayInMs: null,
 				chunking: (buf: string) => {
 					// emit a sentence if we see ., !, ? followed by space/end
-					const m = buf.match(/^(.+?[.!?])(?:\s+|$)/);
+					const m = buf.match(/^(.+?[.!?\n])(?:\s+|$)/);
 					if (m) return m[0];
 					// otherwise emit a clause if it's getting long
-					if (buf.length > 120) return buf;
+					// if (buf.length > 120) return buf;
 					return null;
 				},
 			}),
 		});
 
 		let fullReply = '';
+
+		// Process each sentence as it streams in
 		for await (const chunk of result.textStream) {
 			const sentence = String(chunk).trim();
 			if (!sentence) continue;
 
 			fullReply += (fullReply ? ' ' : '') + sentence;
-			ws.send(JSON.stringify({ type: 'status', text: 'Speaking…' }));
+
+			// Check if WebSocket is still open before sending
+			if (ws.readyState === WebSocket.READY_STATE_OPEN) {
+				ws.send(JSON.stringify({ type: 'status', text: 'Speaking…' }));
+			}
 
 			console.log('<<', sentence);
 
-			// serialize TTS per sentence (keeps order) but don't block the reader too long
-			// DO NOT await here – let the reader continue; queue enforces order=1
+			// Queue TTS for this sentence immediately (don't wait for full response)
 			void this.queue.add(async () => {
-				const tts = await generateSpeech({ model: models.ttsModel, text: sentence, voice: this.env.VOICE_ID });
+				try {
+					// Check if WebSocket is still open before generating and sending TTS
+					if (ws.readyState !== WebSocket.READY_STATE_OPEN) {
+						console.log('WebSocket closed, skipping TTS for:', sentence);
+						return;
+					}
 
-				// normalize to a base64 string
-				let b64: string;
-				if (typeof tts === 'string') {
-					b64 = tts;
-				} else if (tts && typeof tts === 'object' && 'audio' in tts) {
-					b64 = tts.audio.base64;
-				} else {
-					// Convert Uint8Array to base64
-					b64 = btoa(String.fromCharCode(...new Uint8Array(tts as ArrayBuffer)));
+					const tts = await generateSpeech({ model: models.ttsModel, text: sentence, voice: this.env.VOICE_ID });
+
+					// normalize to a base64 string
+					let b64: string;
+					if (typeof tts === 'string') {
+						b64 = tts;
+					} else if (tts && typeof tts === 'object' && 'audio' in tts) {
+						b64 = tts.audio.base64;
+					} else {
+						// Convert Uint8Array to base64
+						b64 = btoa(String.fromCharCode(...new Uint8Array(tts as ArrayBuffer)));
+					}
+
+					// Check again after TTS generation (it might have closed during generation)
+					if (ws.readyState === WebSocket.READY_STATE_OPEN) {
+						ws.send(JSON.stringify({ type: 'audio', text: sentence, audio: b64 }));
+					}
+				} catch (error) {
+					console.error('TTS error for sentence:', sentence, error);
 				}
-
-				ws.send(JSON.stringify({ type: 'audio', text: sentence, audio: b64 }));
 			});
 		}
 
@@ -175,7 +196,11 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 
 		// Only after the model finishes: add one assistant turn to history
 		this.msgHistory.push({ role: 'assistant', content: fullReply });
-		ws.send(JSON.stringify({ type: 'status', text: 'Idle' }));
+
+		// Check if WebSocket is still open before sending final status
+		if (ws.readyState === WebSocket.READY_STATE_OPEN) {
+			ws.send(JSON.stringify({ type: 'status', text: 'Idle' }));
+		}
 
 		// Optional debug:
 		console.log('finishReason:', await result.finishReason);
