@@ -171,17 +171,43 @@ export const useAgentConversation = (campaignId: string) => {
 
       // show *your* words (server sends {type:"text"} or {type:"transcript"})
       if (msg.type === "text" || msg.type === "transcript") {
-        setMessages((m) => [...m, { role: "user", content: msg.text }]);
+        if (msg.text) {
+          setMessages((m) => {
+            if (m.length > 0 && m[m.length - 1].role === "user") {
+              const lastUser = m[m.length - 1];
+              return [
+                ...m.slice(0, -1),
+                {
+                  role: "user",
+                  content: `${lastUser.content} ${msg.text}`,
+                },
+              ];
+            } else {
+              return [...m, { role: "user", content: msg.text }];
+            }
+          });
+        }
         return;
       }
 
       // assistant audio + text (handle flat or nested audio)
       if (msg.type === "audio" || msg.type === "assistant") {
-        if (msg.text)
-          setMessages((m) => [
-            ...m,
-            { role: "assistant", content: msg.text as string },
-          ]);
+        if (msg.text) {
+          setMessages((m) => {
+            if (m.length > 0 && m[m.length - 1].role === "assistant") {
+              const lastAssistant = m[m.length - 1];
+              return [
+                ...m.slice(0, -1),
+                {
+                  role: "assistant",
+                  content: `${lastAssistant.content} ${msg.text}`,
+                },
+              ];
+            } else {
+              return [...m, { role: "assistant", content: msg.text as string }];
+            }
+          });
+        }
         const raw =
           typeof msg.audio === "string"
             ? msg.audio
