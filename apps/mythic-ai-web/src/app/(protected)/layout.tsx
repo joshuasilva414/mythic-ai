@@ -16,9 +16,11 @@ export default async function Layout({
     return redirect("/sign-in");
   }
   return (
-    <div>
+    <div className="flex flex-col h-screen overflow-hidden">
       <Navbar session={session} />
-      {children}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 }

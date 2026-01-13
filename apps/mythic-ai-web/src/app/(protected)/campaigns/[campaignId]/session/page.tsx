@@ -17,7 +17,7 @@ export default async function Home({
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex-1 min-h-0 flex flex-col">
       <Conversation campaignId={campaignId} />
     </div>
   );

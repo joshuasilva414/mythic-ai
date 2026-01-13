@@ -12,6 +12,7 @@ declare global {
 }
 
 export const useAgentConversation = (campaignId: string) => {
+  const [playStatus, setPlayStatus] = useState<"playing" | "paused">("paused");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [status, setStatus] = useState<string>("");
   const [connected, setConnected] = useState(false);
@@ -37,7 +38,7 @@ export const useAgentConversation = (campaignId: string) => {
     startOnLoad: false,
     onSpeechStart: () => setStatus("Listening…"),
     onSpeechEnd: (audio) => {
-      setStatus("Processing…");
+      setStatus("Thinking...");
       const wav = encodeWavPCM16(audio, 16_000); // audio is Float32Array@16k
       wsRef.current?.send(wav);
     },
@@ -295,6 +296,7 @@ export const useAgentConversation = (campaignId: string) => {
     onStart,
     onStop,
     onClear,
+    playStatus,
     chatContainerRef,
   };
 };
