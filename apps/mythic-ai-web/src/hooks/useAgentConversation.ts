@@ -12,6 +12,7 @@ declare global {
 }
 
 export const useAgentConversation = (campaignId: string) => {
+  const [muted, setMuted] = useState(false);
   const [playStatus, setPlayStatus] = useState<"playing" | "paused">("paused");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [status, setStatus] = useState<string>("");
@@ -277,6 +278,18 @@ export const useAgentConversation = (campaignId: string) => {
     isPlayingRef.current = false;
   };
 
+  const onMute = () => {
+    setMuted(true);
+    vad.pause();
+    audioCtx?.suspend();
+  };
+
+  const onUnmute = () => {
+    setMuted(false);
+    vad.start();
+    audioCtx?.resume();
+  };
+
   useEffect(() => {
     return () => {
       vad.pause();
@@ -285,6 +298,8 @@ export const useAgentConversation = (campaignId: string) => {
   }, []);
 
   return {
+    onMute,
+    onUnmute,
     messages,
     status,
     connected,
@@ -297,6 +312,7 @@ export const useAgentConversation = (campaignId: string) => {
     onStop,
     onClear,
     playStatus,
+    muted,
     chatContainerRef,
   };
 };

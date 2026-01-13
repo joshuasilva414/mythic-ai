@@ -11,20 +11,18 @@ import { Pause, Play, Square, Mic, MicOff } from "lucide-react";
 import { Card } from "./ui/card";
 
 export function Conversation({ campaignId }: { campaignId: string }) {
-  const [muted, setMuted] = useState<boolean>(false);
   const {
     messages,
     status,
-    connected,
     listening,
-    playbackEl,
     aiSpeaking,
-    audioCtx,
     onStart,
     onStop,
     onClear,
+    onMute,
+    onUnmute,
+    muted,
     chatContainerRef,
-    vad,
     playStatus,
   } = useAgentConversation(campaignId);
 
@@ -59,12 +57,12 @@ export function Conversation({ campaignId }: { campaignId: string }) {
             {muted ? (
               <Button
                 className="bg-gray-400 hover:bg-gray-500"
-                onClick={() => setMuted(false)}
+                onClick={() => onUnmute()}
               >
                 <MicOff />
               </Button>
             ) : (
-              <Button onClick={() => setMuted(true)}>
+              <Button onClick={() => onMute()}>
                 <Mic />
               </Button>
             )}
