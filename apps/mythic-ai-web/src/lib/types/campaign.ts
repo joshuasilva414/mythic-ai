@@ -1,4 +1,4 @@
-import { campaigns } from "@/db/schema";
+import { campaigns } from "db/schema";
 
 export type Campaign = typeof campaigns.$inferSelect;
 

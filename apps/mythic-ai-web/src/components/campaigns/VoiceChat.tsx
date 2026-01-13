@@ -7,7 +7,11 @@ import VoiceVisualStatus from "@/components/campaigns/VoiceVisualStatus";
 import { Role, ChatMsg, WebSocketMessage } from "@/lib/types/campaign";
 import { useAgentConversation } from "@/hooks/useAgentConversation";
 
-export default function VoiceChat() {
+interface VoiceChatProps {
+  campaignId: string;
+}
+
+export default function VoiceChat({ campaignId }: VoiceChatProps) {
   const {
     messages,
     status,
@@ -21,7 +25,7 @@ export default function VoiceChat() {
     onClear,
     chatContainerRef,
     vad,
-  } = useAgentConversation();
+  } = useAgentConversation(campaignId);
 
   return (
     <div className="flex flex-col gap-4">
