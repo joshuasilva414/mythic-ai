@@ -24,11 +24,12 @@ export function Conversation({ campaignId }: { campaignId: string }) {
     muted,
     chatContainerRef,
     playStatus,
+    pauseSession,
+    resumeSession,
   } = useAgentConversation(campaignId);
 
   const handleStart = useCallback(async () => {
     try {
-      // await navigator.mediaDevices.getUserMedia({ audio: true });
       await onStart();
     } catch (error) {
       console.error("Failed to start conversation:", error);
@@ -66,12 +67,16 @@ export function Conversation({ campaignId }: { campaignId: string }) {
                 <Mic />
               </Button>
             )}
-            {playStatus == "paused" ? (
+            {playStatus == "not-started" ? (
               <Button onClick={handleStart}>
                 <Play />
               </Button>
+            ) : playStatus == "paused" ? (
+              <Button onClick={resumeSession}>
+                <Play />
+              </Button>
             ) : (
-              <Button onClick={onStop}>
+              <Button onClick={pauseSession}>
                 <Pause />
               </Button>
             )}

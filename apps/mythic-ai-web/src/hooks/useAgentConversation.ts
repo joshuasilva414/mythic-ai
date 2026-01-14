@@ -13,7 +13,9 @@ declare global {
 
 export const useAgentConversation = (campaignId: string) => {
   const [muted, setMuted] = useState(false);
-  const [playStatus, setPlayStatus] = useState<"playing" | "paused">("paused");
+  const [playStatus, setPlayStatus] = useState<
+    "playing" | "paused" | "not-started"
+  >("not-started");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [status, setStatus] = useState<string>("");
   const [connected, setConnected] = useState(false);
@@ -262,13 +264,18 @@ export const useAgentConversation = (campaignId: string) => {
     if (ctx) setAudioCtx(ctx);
 
     vad.start();
+    setPlayStatus("playing");
     setListening(true);
     setStatus("Listening…");
   };
+
   const onStop = () => {
     vad.pause();
     setListening(false);
-    setStatus("");
+    setPlayStatus("not-started");
+    playbackEl?.pause();
+    setStatus("Stopped");
+    disconnect();
   };
   const onClear = () => {
     setMessages([]);
@@ -276,6 +283,19 @@ export const useAgentConversation = (campaignId: string) => {
     wsRef.current?.send(JSON.stringify({ type: "cmd", data: "clear" }));
     audioQueueRef.current = [];
     isPlayingRef.current = false;
+  };
+
+  const pauseSession = () => {
+    vad.pause();
+    setListening(false);
+    playbackEl?.pause();
+    setPlayStatus("paused");
+  };
+  const resumeSession = () => {
+    vad.start();
+    setListening(true);
+    playbackEl?.play();
+    setPlayStatus("playing");
   };
 
   const onMute = () => {
@@ -312,6 +332,8 @@ export const useAgentConversation = (campaignId: string) => {
     onStop,
     onClear,
     playStatus,
+    pauseSession,
+    resumeSession,
     muted,
     chatContainerRef,
   };
