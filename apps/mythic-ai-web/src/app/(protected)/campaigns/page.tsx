@@ -74,7 +74,7 @@ export default async function CampaignsPage() {
             </CardContent>
             <CardFooter>
               <Button asChild className="w-full" variant="secondary">
-                <Link href={`/campaigns/${campaign.id}/session`}>Play</Link>
+                <Link href={`/campaigns/${campaign.id}/sessions`}>Play</Link>
               </Button>
             </CardFooter>
           </Card>

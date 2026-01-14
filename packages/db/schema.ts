@@ -15,6 +15,17 @@ export const campaigns = sqliteTable("campaigns", {
     .default(sql`CURRENT_TIMESTAMP` as any),
 });
 
+export const sessions = sqliteTable("sessions", {
+  id: int("id").primaryKey({ autoIncrement: true }),
+  campaignId: int("campaign_id")
+    .notNull()
+    .references(() => campaigns.id),
+  createdAt: text()
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP` as any),
+  summary: text("summary").notNull(),
+});
+
 export const campaignsRelations = relations(campaigns, ({ one }) => ({
   user: one(user, {
     fields: [campaigns.userId],
