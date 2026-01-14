@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ChatMsg } from "@/lib/types/campaign";
 import { RefObject } from "react";
 
-import { Pause, Play, Square, Mic, MicOff } from "lucide-react";
+import { Pause, Play, Square, Mic, MicOff, RotateCcw } from "lucide-react";
 import { Card } from "./ui/card";
 
 export function Conversation({ campaignId }: { campaignId: string }) {
@@ -84,11 +84,15 @@ export function Conversation({ campaignId }: { campaignId: string }) {
             <Button onClick={onStop} className="bg-red-500">
               <Square />
             </Button>
+
+            <Button onClick={onClear} className="bg-gray-600">
+              <RotateCcw />
+            </Button>
           </div>
         </Card>
-        <div className="flex flex-col items-center">
+        {/* <div className="flex flex-col items-center">
           <p>Status: {status}</p>
-        </div>
+        </div> */}
       </div>
       <div className="w-2/3 flex-1 min-h-0 overflow-hidden">
         <ChatContainer

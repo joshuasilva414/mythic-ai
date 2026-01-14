@@ -280,9 +280,17 @@ export const useAgentConversation = (campaignId: string) => {
   const onClear = () => {
     setMessages([]);
     setStatus("");
+    if (playbackEl) {
+      playbackEl.pause();
+      playbackEl.src = "";
+      playbackEl.removeAttribute("src");
+    }
+
     wsRef.current?.send(JSON.stringify({ type: "cmd", data: "clear" }));
     audioQueueRef.current = [];
     isPlayingRef.current = false;
+    disconnect();
+    connect();
   };
 
   const pauseSession = () => {

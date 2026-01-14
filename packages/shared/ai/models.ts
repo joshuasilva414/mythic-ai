@@ -11,9 +11,9 @@ export function createModels(config: AIConfig) {
   // const elevenlabs = createElevenLabs({ apiKey: config.elevenlabsApiKey });
 
   return {
-    chatModel: openai.responses("gpt-5"), // Use responses API for gpt-5
-    ttsModel: openai.speech("tts-1"),
-    sttModel: openai.transcription("whisper-1"),
+    chatModel: openai.responses("gpt-5-nano"), // Use responses API for gpt-5
+    ttsModel: openai.speech("gpt-4o-mini-tts"),
+    sttModel: openai.transcription("gpt-4o-mini-transcribe"),
   };
 }
 
