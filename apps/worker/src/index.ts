@@ -8,7 +8,6 @@ import {
 	tool,
 } from 'ai';
 import { DurableObject } from 'cloudflare:workers';
-// import { chatModel, ttsModel, sttModel } from './agent';
 import { createModels } from 'shared/ai/models';
 import PQueue from 'p-queue';
 import z from 'zod';
@@ -23,6 +22,7 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 	msgHistory: ModelMessage[];
 	worldSetting?: string;
 	queue: PQueue;
+	responseAbortController: AbortController;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
@@ -30,6 +30,7 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 		this.campaignId = Number.parseInt(ctx.id.name!);
 		this.msgHistory = [];
 		this.queue = new PQueue({ concurrency: 1 });
+		this.responseAbortController = new AbortController();
 	}
 
 	async init(campaignId: number) {
@@ -78,6 +79,7 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 
 	// Hibernatable WebSocket handler - called when a message is received
 	async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+		const abortSignal = this.responseAbortController.signal;
 		const models = createModels({
 			openaiApiKey: this.env.OPENAI_API_KEY,
 			elevenlabsApiKey: this.env.ELEVENLABS_API_KEY,
@@ -88,6 +90,11 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 				const { type, data } = JSON.parse(message);
 				if (type === 'cmd' && data === 'clear') {
 					this.msgHistory.length = 0; // clear chat history
+				}
+				if (type === 'cmd' && data === 'interrupt') {
+					this.queue.clear();
+					this.responseAbortController.abort();
+					this.responseAbortController = new AbortController();
 				}
 			} catch {
 				// Not JSON, ignore
@@ -141,6 +148,10 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 					return null;
 				},
 			}),
+			abortSignal,
+			onAbort: () => {
+				console.log('text stream aborted');
+			},
 		});
 
 		let fullReply = '';
@@ -168,7 +179,7 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 						return;
 					}
 
-					const tts = await generateSpeech({ model: models.ttsModel, text: sentence, voice: this.env.VOICE_ID });
+					const tts = await generateSpeech({ model: models.ttsModel, text: sentence, voice: this.env.VOICE_ID, abortSignal });
 
 					// normalize to a base64 string
 					let b64: string;
@@ -182,11 +193,16 @@ export class DungeonMasterDurableObject extends DurableObject<Env> {
 					}
 
 					// Check again after TTS generation (it might have closed during generation)
-					if (ws.readyState === WebSocket.READY_STATE_OPEN) {
+					if (ws.readyState === WebSocket.READY_STATE_OPEN && !abortSignal.aborted) {
 						ws.send(JSON.stringify({ type: 'audio', text: sentence, audio: b64 }));
 					}
-				} catch (error) {
-					console.error('TTS error for sentence:', sentence, error);
+				} catch (error: any) {
+					if (error.name === 'AbortError') {
+						console.log('TTS successfully aborted!');
+						return;
+					} else {
+						console.error('TTS error for sentence:', sentence, error);
+					}
 				}
 			});
 		}

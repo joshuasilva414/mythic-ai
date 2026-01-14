@@ -19,8 +19,7 @@ export function Conversation({ campaignId }: { campaignId: string }) {
     onStart,
     onStop,
     onClear,
-    onMute,
-    onUnmute,
+    toggleMute,
     muted,
     chatContainerRef,
     playStatus,
@@ -58,12 +57,12 @@ export function Conversation({ campaignId }: { campaignId: string }) {
             {muted ? (
               <Button
                 className="bg-gray-400 hover:bg-gray-500"
-                onClick={() => onUnmute()}
+                onClick={() => toggleMute()}
               >
                 <MicOff />
               </Button>
             ) : (
-              <Button onClick={() => onMute()}>
+              <Button onClick={() => toggleMute()}>
                 <Mic />
               </Button>
             )}

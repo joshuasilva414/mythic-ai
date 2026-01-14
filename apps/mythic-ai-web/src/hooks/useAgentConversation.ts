@@ -3,6 +3,7 @@ import { useMicVAD } from "@ricky0123/vad-react";
 import { encodeWavPCM16 } from "@/lib/audio";
 import { b64ToBlob, sniffAudioMime } from "@/lib/audio";
 import { ChatMsg, WebSocketMessage } from "@/lib/types/campaign";
+import assert from "assert";
 
 declare global {
   interface Window {
@@ -28,6 +29,7 @@ export const useAgentConversation = (campaignId: string) => {
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioQueueRef = useRef<Blob[]>([]);
+  const chatQueueRef = useRef<ChatMsg[]>([]);
   const isPlayingRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +41,13 @@ export const useAgentConversation = (campaignId: string) => {
 
   const vad = useMicVAD({
     startOnLoad: false,
-    onSpeechStart: () => setStatus("Listening…"),
+    onSpeechStart: () => {
+      if (aiSpeaking) interrupt();
+      else {
+        setStatus("Listening…");
+        setListening(true);
+      }
+    },
     onSpeechEnd: (audio) => {
       setStatus("Thinking...");
       const wav = encodeWavPCM16(audio, 16_000); // audio is Float32Array@16k
@@ -92,6 +100,20 @@ export const useAgentConversation = (campaignId: string) => {
       if (pendingTtsRef.current <= 0) setAiSpeaking(false);
       return;
     }
+
+    const nextText = chatQueueRef.current.shift();
+    assert(nextText);
+    setMessages((m) => {
+      if (m.length === 0) return [nextText];
+      const last = m[m.length - 1];
+      if (last.role === "assistant") {
+        return [
+          ...m.slice(0, -1),
+          { ...last, content: last.content + " " + nextText.content },
+        ];
+      }
+      return [...m, nextText];
+    });
 
     isPlayingRef.current = true;
     const url = URL.createObjectURL(next);
@@ -197,19 +219,9 @@ export const useAgentConversation = (campaignId: string) => {
       // assistant audio + text (handle flat or nested audio)
       if (msg.type === "audio" || msg.type === "assistant") {
         if (msg.text) {
-          setMessages((m) => {
-            if (m.length > 0 && m[m.length - 1].role === "assistant") {
-              const lastAssistant = m[m.length - 1];
-              return [
-                ...m.slice(0, -1),
-                {
-                  role: "assistant",
-                  content: `${lastAssistant.content} ${msg.text}`,
-                },
-              ];
-            } else {
-              return [...m, { role: "assistant", content: msg.text as string }];
-            }
+          chatQueueRef.current.push({
+            role: "assistant",
+            content: msg.text as string,
           });
         }
         const raw =
@@ -221,11 +233,6 @@ export const useAgentConversation = (campaignId: string) => {
         const mime = sniffAudioMime(raw); // picks audio/mpeg for MeloTTS
         enqueueAudio(b64ToBlob(raw, mime));
         return;
-
-        // log play() errors so you see if autoplay is blocked
-        // (see autoplay policies below)
-        //  - put this inside playNext() on the Audio element:
-        // a.play().catch(err => setStatus(`Playback blocked: ${String(err)}`));
       }
     };
 
@@ -237,16 +244,18 @@ export const useAgentConversation = (campaignId: string) => {
     wsRef.current = null;
   };
 
-  // VAD: sends WAV PCM16 (mono 16k) as binary
-  //   const vad = useMicVAD({
-  //     startOnLoad: false,
-  //     onSpeechStart: () => setStatus("Listening…"),
-  //     onSpeechEnd: (audio) => {
-  //       setStatus("Processing…");
-  //       const wav = encodeWavPCM16(audio, 16_000);
-  //       wsRef.current?.send(wav);
-  //     },
-  //   });
+  const interrupt = () => {
+    setStatus("Listening…");
+    audioQueueRef.current = [];
+    chatQueueRef.current = [];
+    if (playbackEl) {
+      playbackEl.pause();
+      playbackEl.src = "";
+      playbackEl.removeAttribute("src");
+    }
+    isPlayingRef.current = false;
+    wsRef.current?.send(JSON.stringify({ type: "cmd", data: "interrupt" }));
+  };
 
   const onStart = async () => {
     connect(); // creates wsRef.current
@@ -276,19 +285,13 @@ export const useAgentConversation = (campaignId: string) => {
     playbackEl?.pause();
     setStatus("Stopped");
     disconnect();
+    setAiSpeaking(false);
   };
   const onClear = () => {
+    interrupt();
     setMessages([]);
     setStatus("");
-    if (playbackEl) {
-      playbackEl.pause();
-      playbackEl.src = "";
-      playbackEl.removeAttribute("src");
-    }
-
     wsRef.current?.send(JSON.stringify({ type: "cmd", data: "clear" }));
-    audioQueueRef.current = [];
-    isPlayingRef.current = false;
     disconnect();
     connect();
   };
@@ -296,6 +299,7 @@ export const useAgentConversation = (campaignId: string) => {
   const pauseSession = () => {
     vad.pause();
     setListening(false);
+    setAiSpeaking(false);
     playbackEl?.pause();
     setPlayStatus("paused");
   };
@@ -306,16 +310,17 @@ export const useAgentConversation = (campaignId: string) => {
     setPlayStatus("playing");
   };
 
-  const onMute = () => {
-    setMuted(true);
-    vad.pause();
-    audioCtx?.suspend();
-  };
-
-  const onUnmute = () => {
-    setMuted(false);
-    vad.start();
-    audioCtx?.resume();
+  const toggleMute = () => {
+    setMuted((muted) => {
+      if (muted) {
+        vad.pause();
+        audioCtx?.suspend();
+      } else {
+        vad.start();
+        audioCtx?.resume();
+      }
+      return !muted;
+    });
   };
 
   useEffect(() => {
@@ -326,8 +331,7 @@ export const useAgentConversation = (campaignId: string) => {
   }, []);
 
   return {
-    onMute,
-    onUnmute,
+    toggleMute,
     messages,
     status,
     connected,
